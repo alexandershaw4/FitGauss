@@ -1,4 +1,4 @@
-function X = makef(w,Fq,Amp,Wid)
+function X = makegauskew(w,Fq,Amp,Wid,Skew)
 %
 % afit.makef(w,Fq,Amp,Wid)
 %
@@ -9,12 +9,20 @@ function X = makef(w,Fq,Amp,Wid)
 %
 % AS
 
+if nargin==2 && isstruct(Fq)
+   w    = w;
+   Skew = Fq.s;
+   Wid  = Fq.w;
+   Amp  = Fq.a;
+   Fq   = Fq.f;
+end
+
 if length(Fq) > 1
     for i = 1:length(Fq)
         try
-            X0 = X0 + afit.makef(w,Fq(i),Amp(i),Wid(i));
+            X0 = X0 + afit.makegauskew(w,Fq(i),Amp(i),Wid(i),Skew(i));
         catch
-            X0 =      afit.makef(w,Fq(i),Amp(i),Wid(i));
+            X0 =      afit.makegauskew(w,Fq(i),Amp(i),Wid(i),Skew(i));
         end
         %X0(i,:) = afit.makef(w,Fq(i),Amp(i),Wid(i));
 
@@ -23,7 +31,6 @@ if length(Fq) > 1
     X  = X0;
     return;
 end
-
 
 try Wid ; catch Wid = 2; end
 try Amp ; catch Amp = 2; end
@@ -38,7 +45,5 @@ w   = w - mw;
 X   = X + Amp * exp( -(w-f).^2 / (2*(2*Wid)^2) );
 w   = w + mw;
 
-if sum(X) == 0
-    % exception with 1 node models where sum==0
-    X   = X + Amp * exp( -(w-Fq).^2 / (2*(2*Wid)^2) );
-end
+% Apply skew
+X = (2*X).*normcdf(Skew*w);

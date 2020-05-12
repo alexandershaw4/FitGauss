@@ -1,5 +1,5 @@
 function [P,F] = fitgaussiansbayes(t,x,n,w)
-global dx dt p0 n0 
+global dx dt p0 n0
 %
 %
 % AS2019
@@ -18,16 +18,7 @@ if n == 1
 else
 
     % We'll try getting initial (prior) points using 'findpeaks'
-    [PKS,LOCS,W] = findpeaks(x,t,'NPeaks',n*2);
-    
-    % Pick biggest n from n*2
-    [~,I]=sort(PKS,'descend');
-    
-    if length(LOCS) >= n
-        PKS  = PKS(I(1:n));
-        LOCS = LOCS(I(1:n));
-        W    = W(I(1:n));
-    end
+    [PKS,LOCS,W] = findpeaks(x,t,'NPeaks',n);
 
     % If find peaks hasn't found good initial points, just even space the
     % number of guestimated bumps along t
@@ -59,13 +50,16 @@ for i    = 1:n
     w(i) = W(i)/(n*n);
 end
 
-skew = zeros(1,n);
+% Noise shape (one-over-f squared [oof]) parameters:
+% a * (1./f.^b);
+noi.a = 1e-2;
+noi.b = 2;
 
 % Parameter set
 p.f = f;
 p.a = a;
 p.w = w;
-p.s = skew;
+p.n = noi;
 X   = spm_vec(p);
 p0  = p;
 
@@ -73,7 +67,7 @@ p0  = p;
 M    = [];
 M.IS = @obj;
 M.pE = X;
-M.pC = eye(length(X))*4;
+M.pC = diag(~~X)*4;
 
 xU    = [];
 xU.u  = 0;
@@ -87,25 +81,15 @@ M.l   = 1;
 % Call the external Bayesian EM routine
 [Qp,Cp,Eh,F] = spm_nlsi_GN(M,xU,xY);
 
-% use matlab's fminunc
-% o = optimset('fminunc');
-% o.TolFun = 1e-30;
-% o.MaxFunEvals = 5000;
-% [Qp,F] = fminunc(@obje,X);
-
-% V = double(~~diag(M.pC));
-% V(1:3) = 0; % f
-% V(4:6) = 1/64; % a
-% V(7:9) = 1/512 ;   % w
-% V(10:12) = 0;  %s
-% [Qp,F,CP,PP,H] = AO(@obj,X,V,x,128,[],[],-400,[],2,[],'fe',0,1,1);
+%V = (~~diag(M.pC));
+%V(1:3) = 1/16; % f
+%V(4:6) = 1/64; % a
+%V(7:9) = 1/8 ;   % w
+%V(10:11) = 1/32;  %n
+%[Qp,F,CP,PP,H] = AO(@obj,X,V,x,128,[],[],-400,[],2,[],'fe',1,1,1);
 
 % return parameters in state space
 P = spm_unvec(Qp,p);
-
-% produce and plot
-m  = afit.makegauskew(dt(:)',P.f,P.a,P.w,P.s);
-plot(dt,dx,':',dt,m);drawnow;
 
 
 function e = obj(X,z0,z1,varargin)
@@ -113,20 +97,12 @@ global dx dt p0 n0
 
 % n bump
 XP = spm_unvec(X,p0);
-e  = afit.makegauskew(dt(:)',XP.f,XP.a,XP.w,XP.s);
+e  = afit.makef(dt(:)',XP.f,XP.a,XP.w);
 
+noise = XP.n.a * (1./dt.^XP.n.b);
 
+e = e + noise;
 
-function [e] = obje(X)
-global dx dt p0 n0
-
-e = obj(X);
-e = sum((dx(:) - e(:)).^2);
-
-if nargout == 2
-    [j] = jaco(@obje,X,1e-4*ones(size(X)),0,2);
-    return;
-end
 
 
 

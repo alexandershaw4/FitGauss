@@ -1,4 +1,4 @@
-function [P,F] = fitgaussians(t,x,n)
+function [P,F] = fitgaussians(t,x,n,optfun)
 global dx dt p0 n0
 
 dx = x;
@@ -22,8 +22,17 @@ p.w = w;
 X   = spm_vec(p);
 p0  = p;
 
-[X1,F] = fminsearch(@obj,X);
+%[X1,F] = fminsearch(@obj,X);
+if nargin < 4 || isempty(optfun)
+    optfun = @fminsearch;
+end
 
+if ~strcmp(char(optfun),'AO') && ~strcmp(char(optfun),'AObayes')
+    [X1,F] = optfun(@obj,X);
+else
+    V = ones(size(X))/128;
+    [X1,F] = optfun(@obj,X,V,[],[],[],[],1e-60);
+end
 
 
 
@@ -53,6 +62,6 @@ plot(1:length(dx),dx); hold on
 plot(1:length(dx),Y); hold off;  drawnow;
 
 % error
-e = sum( dx(:) - Y(:) ).^2;
+e = sum(sum( dx(:) - Y(:)' )).^2;
     
     
